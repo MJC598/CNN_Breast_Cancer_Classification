@@ -29,7 +29,7 @@ class CustomImageDataset(Dataset):
             idx = idx.tolist()
 
         # print((self.ava_frame.iloc[idx+1, 0].split("/")[1]).split(".")[0])
-        img_name = os.path.join(self.root_dir, str((self.ava_frame.iloc[idx, 0].split("/")[1]).split(".")[0]) + '.png')
+        img_name = os.path.join(self.root_dir, str((self.ava_frame.iloc[idx, 0].split("/")[1]).split(".")[0]) + ' resized.png')
         if not os.path.isfile(img_name):
             print("file: " + img_name + " does not exist!\n")
             return None
@@ -44,7 +44,8 @@ class CustomImageDataset(Dataset):
             # print(c)
         # if classes_txt == 'MALIGNANT':
             # classes = np.ones((1, 1))
-        classes = (np.ones((1,1)) if classes_txt == 'MALIGNANT' else np.zeros((1,1)))
+        classes = (np.array([0, 1]) if classes_txt == 'MALIGNANT' else np.array([1, 0]))
+        # print(classes)
         # classes = torch.from_numpy(classes.reshape(-1, 1)).float()
         # print(classes)
         if self.transform:
@@ -85,6 +86,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 _, preds = torch.max(outputs, 1)
                 _, ans  = torch.max(labels, 1)
                 loss = criterion(outputs, ans)
+                # print("Predicted: {}\nActual: {}".format(preds, ans))
+                # print('\n')
 
                 # backward + optimize only if in training phase
                 if True:
@@ -158,8 +161,8 @@ def visualize_model(model, num_images=6):
                     return
         model.train(mode=was_training)
 
-custom_dataset = CustomImageDataset(csv_file='/home/matt/data/Breast_Cancer_Data/Converted-Full-Mammogram-PNGs/index.csv', 
-                               root_dir='/home/matt/data/Breast_Cancer_Data/Converted-Full-Mammogram-PNGs/',
+custom_dataset = CustomImageDataset(csv_file='/home/matt/data/Breast_Cancer_Data/Resized-ROI-PNG-Images/index.csv', 
+                               root_dir='/home/matt/data/Breast_Cancer_Data/Resized-ROI-PNG-Images/',
                                transform=transforms.Compose([
                                    transforms.Resize(256), 
                                    transforms.CenterCrop(224), 
@@ -185,17 +188,17 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # out = torchvision.utils.make_grid(batch['image'])
 
 model_ft = models.resnet50(pretrained=True)
-for param in model_ft.parameters():
-    param.requires_grad = False
+# for param in model_ft.parameters():
+#     param.requires_grad = False
 num_ftrs = model_ft.fc.in_features
 # Here the size of each output sample is set to 2.
 # Alternatively, it can be generalized to nn.Linear(num_ftrs, len(class_names)).
 # model_ft.fc = nn.Linear(num_ftrs, 10)
-model_ft.fc = nn.Linear(num_ftrs, 1)
+model_ft.fc = nn.Linear(num_ftrs, 2)
 
-# model_ft.load_state_dict(torch.load("Oct28_r50_6ep_32batch.pt"))
-# for param in model_ft.parameters():
-#     param.requires_grad = True
+model_ft.load_state_dict(torch.load("Nov19_r50_5ep_classifier.pt"))
+for param in model_ft.parameters():
+    param.requires_grad = True
 
 model_ft = model_ft.to(device)
 
@@ -207,9 +210,9 @@ optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.01, momentum=0.9)
 # Decay LR by a factor of 0.1 every 7 epochs
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
 
-model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=10)
+model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=15)
 torch.save(model_ft.state_dict(), "Nov19_r50_5ep_classifier.pt")
 
-visualize_model(model_ft)
+# visualize_model(model_ft)
 
 # imshow(out, title="class list")
